@@ -1,0 +1,84 @@
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Flatten
+from tensorflow.keras.optimizers import Adam
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+
+# Paths
+data_dir = 'animal'  # Update this to your folder path
+
+# Data generators with splitting
+datagen = ImageDataGenerator(
+    rescale=1.0/255.0,
+    validation_split=0.2  # 80-20 split for train-validation
+)
+
+train_generator = datagen.flow_from_directory(
+    data_dir,
+    target_size=(224, 224),
+    batch_size=32,
+    class_mode='categorical',
+    subset='training',
+    shuffle=True
+)
+
+val_generator = datagen.flow_from_directory(
+    data_dir,
+    target_size=(224, 224),
+    batch_size=32,
+    class_mode='categorical',
+    subset='validation',
+    shuffle=True
+)
+
+# Load VGG16 model pre-trained on ImageNet
+base_model = VGG16(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+
+# Freeze the layers
+for layer in base_model.layers:
+    layer.trainable = False
+
+# Build the model
+model = Sequential([
+    base_model,
+    Flatten(),
+    Dense(256, activation='relu'),
+    Dense(len(train_generator.class_indices), activation='softmax')  # Adjust output layer to match number of classes
+])
+
+model.compile(optimizer=Adam(learning_rate=0.0001), loss='categorical_crossentropy', metrics=['accuracy'])
+
+# Train the model
+history = model.fit(
+    train_generator,
+    validation_data=val_generator,
+    epochs=10
+)
+
+# Plot training results
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.title('Training and Validation Accuracy')
+plt.show()
+
+# Make predictions
+import random
+
+class_labels = list(train_generator.class_indices.keys())
+for _ in range(5):  # Display 5 random predictions
+    img, label = val_generator.next()
+    true_label = np.argmax(label[0])
+    prediction = model.predict(img)
+    predicted_label = np.argmax(prediction[0])
+    
+    plt.imshow(img[0])
+    plt.title(f"Predicted: {class_labels[predicted_label]}, Actual: {class_labels[true_label]}")
+    plt.axis('off')
+    plt.show()

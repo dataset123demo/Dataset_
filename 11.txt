@@ -1,0 +1,77 @@
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.layers import Dense, Flatten, Dropout
+from tensorflow.keras.models import Model
+import matplotlib.pyplot as plt
+
+train_dir = 'train'
+test_dir = 'test'
+
+train_datagen = ImageDataGenerator(rescale=1.0/255, rotation_range=40, width_shift_range=0.2,
+                                   height_shift_range=0.2, shear_range=0.2, zoom_range=0.2, horizontal_flip=True)
+
+test_datagen = ImageDataGenerator(rescale=1.0/255)
+
+train_generator = train_datagen.flow_from_directory(
+    train_dir, target_size=(224, 224), batch_size=32, class_mode='categorical'
+)
+
+test_generator = test_datagen.flow_from_directory(
+    test_dir, target_size=(224, 224), batch_size=32, class_mode='categorical'
+)
+
+base_model = MobileNetV2(input_shape=(224, 224, 3), include_top=False, weights='imagenet')
+base_model.trainable = False
+
+# Adding custom layers on top of base model
+x = Flatten()(base_model.output)
+x = Dense(1024, activation='relu')(x)
+x = Dropout(0.5)(x)
+output = Dense(train_generator.num_classes, activation='softmax')(x)
+
+model = Model(inputs=base_model.input, outputs=output)
+
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+history = model.fit(
+    train_generator,
+    validation_data=test_generator,
+    epochs=10
+)
+
+import numpy as np
+# Evaluate the model
+test_loss, test_acc = model.evaluate(test_generator)
+print(f"Test Accuracy: {test_acc}")
+
+# Make predictions and display images with predictions
+class_names = list(test_generator.class_indices.keys())  # Convert to list for indexing
+
+for images, labels in test_generator:
+    predictions = model.predict(images)
+    for i in range(len(predictions)):
+        pred_class = np.argmax(predictions[i])
+        true_class = np.argmax(labels[i])
+        
+        plt.imshow(images[i])
+        plt.title(f"Predicted: {class_names[pred_class]}, Actual: {class_names[true_class]}")
+        plt.axis('off')
+        plt.show()
+    break
+
+# Plot accuracy
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.show()
+
+# Plot loss
+plt.plot(history.history['loss'], label='Training Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()

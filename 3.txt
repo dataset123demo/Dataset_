@@ -1,0 +1,82 @@
+#a. Importing necessary packages
+
+import tensorflow as tf
+from tensorflow import keras
+import matplotlib.pyplot as plt
+import random
+import pandas as pd
+import numpy as np
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPooling2D
+from tensorflow.keras.optimizers import Adam
+
+#b. Load the training and testing data (MNIST)
+
+# Load the data
+data = pd.read_csv('mnist_784_csv.csv')
+print(f"Data shape: {data.shape}")  # Expect (70000, 785)
+
+# Split into train and test sets and normalize the pixel values (scale them to range [0,1])
+x_train = data.iloc[:60000, 1:].values.astype('float32') / 255.0  # First 60000 rows as training
+y_train = data.iloc[:60000, 0].values.astype('int')               # First column as labels
+
+x_test = data.iloc[60000:, 1:].values.astype('float32') / 255.0    # Remaining rows as testing
+y_test = data.iloc[60000:, 0].values.astype('int')                 # First column as labels
+
+# Reshape for CNN (28x28 images with 1 channel)
+x_train = np.reshape(x_train, (60000, 28, 28, 1))
+x_test = np.reshape(x_test, (10000, 28, 28, 1))
+
+# Final shape check
+print(f"x_train shape: {x_train.shape}")  # Should be (60000, 28, 28, 1)
+print(f"x_test shape: {x_test.shape}")    # Should be (10000, 28, 28, 1)
+
+
+#c. Define the network architecture using Keras
+model = keras.Sequential([
+    keras.layers.Flatten(input_shape=(28,28)),
+    keras.layers.Dense(128, activation="relu"),
+    keras.layers.Dense(10, activation="softmax"),    
+])
+model.summary()
+
+#d. Train the model using SGD
+model.compile(optimizer="sgd",
+              loss="sparse_categorical_crossentropy",  
+              metrics=['accuracy'])
+
+history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=10)
+
+#e. Evaluate the network
+test_loss, test_acc=model.evaluate(x_test, y_test)
+print("Loss=%.3f" %test_loss)
+print("Accuracy=%.3f" %test_acc)
+
+n = random.randint(0,9999)
+plt.imshow(x_test[n])
+plt.show()
+predicted_value = model.predict(x_test)
+plt.imshow(x_test[n])
+plt.show()
+
+print('Predicted Value:', predicted_value[n])
+
+#f. Plot the training loss and accuracy
+#Plotting the training accuracy
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['Train','Validation'], loc='upper right')
+plt.show()
+
+#Plotting the training loss
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['Train','Validation'], loc='upper left')
+plt.show()

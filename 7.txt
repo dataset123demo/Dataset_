@@ -1,0 +1,229 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow.keras import layers, models
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
+
+# Step 2: Loading and Preprocessing the Image Data
+train_dir = 'Training'
+test_dir = 'Testing'
+
+IMG_HEIGHT, IMG_WIDTH = 150, 150
+BATCH_SIZE = 32
+
+train_datagen = ImageDataGenerator(
+    rescale=1./255,
+    rotation_range=20,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    fill_mode='nearest'
+)
+
+test_datagen = ImageDataGenerator(rescale=1./255)
+
+train_generator = train_datagen.flow_from_directory(
+    train_dir,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE,
+    class_mode='categorical'
+)
+
+test_generator = test_datagen.flow_from_directory(
+    test_dir,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE,
+    class_mode='categorical'
+)
+
+class_names = ['glioma_tumor', 'meningioma_tumor', 'no_tumor', 'pituitary_tumor']
+
+# Step 3: Defining the Model’s Architecture
+model = models.Sequential()
+
+model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(IMG_HEIGHT, IMG_WIDTH, 3)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(128, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Flatten())
+model.add(layers.Dense(128, activation='relu'))
+model.add(layers.Dense(4, activation='softmax'))
+
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Step 4: Training the Model
+steps_per_epoch = train_generator.samples // BATCH_SIZE
+validation_steps = test_generator.samples // BATCH_SIZE
+
+history = model.fit(
+    train_generator,
+    steps_per_epoch=steps_per_epoch,
+    epochs=5,
+    validation_data=test_generator,
+    validation_steps=validation_steps
+)
+
+# Step 5: Estimating the Model’s Performance
+test_loss, test_acc = model.evaluate(test_generator, verbose=2)
+print(f'Test Accuracy: {test_acc:.4f}')
+
+predictions = model.predict(test_generator)
+predicted_classes = np.argmax(predictions, axis=1)
+true_classes = test_generator.classes
+
+print(classification_report(true_classes, predicted_classes, target_names=train_generator.class_indices.keys()))
+
+cm = confusion_matrix(true_classes, predicted_classes)
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=train_generator.class_indices.keys(), yticklabels=train_generator.class_indices.keys())
+plt.ylabel('True label')
+plt.xlabel('Predicted label')
+plt.title('Confusion Matrix')
+plt.show()
+
+# Step 6: Visualization of Predictions
+def plot_predictions(generator, num_images=20):
+    images, labels = next(generator)
+    predictions = model.predict(images)
+    predicted_classes = np.argmax(predictions, axis=1)
+    true_classes = np.argmax(labels, axis=1)
+    
+    class_names = list(generator.class_indices.keys())
+
+    plt.figure(figsize=(15, 5))
+    for i in range(num_images):
+        plt.subplot(2, num_images // 2, i + 1)
+        plt.imshow(images[i])
+        plt.title(f'True: {class_names[true_classes[i]]} \nPred: {class_names[predicted_classes[i]]}')
+        plt.axis('off')
+    
+    plt.tight_layout()
+    plt.show()
+
+plot_predictions(test_generator)
+
+
+
+
+
+
+
+
+
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from keras.optimizers import Adam
+from keras.callbacks import EarlyStopping
+from tensorflow.keras.preprocessing import image  # Import the image functions
+import numpy as np
+
+# Path to dataset
+train_dir = 'Training'  # Train directory
+test_dir = 'Testing'      # Test directory
+
+#Define image dimensions
+img_width, img_height = 150, 150
+
+# Image preprocessing
+train_datagen = ImageDataGenerator(rescale=1./255)
+test_datagen = ImageDataGenerator(rescale=1./255)
+
+# Load images from directories
+train_generator = train_datagen.flow_from_directory(
+    train_dir,
+    target_size=(150, 150),
+    batch_size=32,
+    class_mode='categorical'
+)
+
+test_generator = test_datagen.flow_from_directory(
+    test_dir,
+    target_size=(150, 150),
+    batch_size=32,
+    class_mode='categorical',
+    shuffle=False  # Important for getting correct labels
+)
+
+# Define the CNN model
+model = models.Sequential([
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(150, 150, 3)),
+    layers.MaxPooling2D((2, 2)),
+    
+    layers.Conv2D(64, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+    
+    layers.Conv2D(128, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+    
+    layers.Flatten(),
+    layers.Dense(128, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(4, activation='softmax')  # 4 categories
+])
+
+# Compile the model
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Train the model
+history = model.fit(
+    train_generator,
+    epochs=10,
+    validation_data=test_generator
+)
+
+# Evaluate the model on the test set
+test_loss, test_acc = model.evaluate(test_generator)
+print(f"Test accuracy: {test_acc}")
+
+# Make predictions on the test set
+predictions = model.predict(test_generator)
+predicted_classes = tf.argmax(predictions, axis=1)  # Get the predicted class indices
+print(predicted_classes)
+
+def preprocess_image(img_path, img_width, img_height):
+    img = image.load_img(img_path, target_size=(img_width, img_height))  # Load and resize image
+    img_array = image.img_to_array(img)  # Convert image to array
+    img_array = np.expand_dims(img_array, axis=0)  # Add a batch dimension
+    img_array /= 255.0  # Normalize the image
+    return img_array
+
+img_path = r'Testing\meningioma_tumor\image(5).jpg'
+preprocessed_img = preprocess_image(img_path, img_width, img_height)
+
+plt.imshow(image.load_img(img_path, target_size=(img_width, img_height)))
+plt.axis('off')  # Turn off axis
+plt.show()
+
+# Make predictions
+prediction = model.predict(preprocessed_img)
+
+# Get the predicted class index
+predicted_class = np.argmax(prediction, axis=1)
+
+# Class labels
+class_labels = ['glioma_tumor', 'meningioma_tumor', 'no_tumor','pituitary_tumor']
+
+# Get the class label for the predicted class
+predicted_label = class_labels[predicted_class[0]]
+
+# Output the prediction
+print(f'The model predicts: {predicted_label}')
+

@@ -1,0 +1,176 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import SimpleRNN, Dense
+
+# Activation functions and derivatives
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+def sigmoid_derivative(x):
+    return x * (1 - x)
+
+# Initialize weights
+Wxh = np.random.randn(10, 5)  # Input to hidden weights
+Whh = np.random.randn(10, 10) # Hidden to hidden weights
+Why = np.random.randn(1, 10)  # Hidden to output weights
+
+bh = np.zeros((10, 1))        # Hidden bias
+by = np.zeros((1, 1))         # Output bias
+
+# Initial hidden state
+h = np.zeros((10, 1))
+
+# Forward pass
+def rnn_step(X, h):
+    h = sigmoid(np.dot(Wxh, X) + np.dot(Whh, h) + bh)  # Update hidden state
+    y = np.dot(Why, h) + by  # Compute output
+    return h, y
+
+# Dummy input sequence
+X = [np.random.randn(5, 1) for _ in range(6)]  # 6 time steps of 5-dimensional input
+
+# Process each time step
+for t in range(len(X)):
+    h, y = rnn_step(X[t], h)
+    print(f"Time step {t}, Output: {y}")
+
+# Define a Sequential model
+model = Sequential()
+
+# Add an RNN layer (input_size = 5, hidden_size = 10)
+model.add(SimpleRNN(10, input_shape=(None, 5)))
+
+# Add a Dense output layer
+model.add(Dense(1))  # output_size = 1
+
+# Compile the model
+model.compile(optimizer='adam', loss='mean_squared_error')
+
+# Generate dummy data
+X = tf.random.normal([1, 6, 5])  # (batch_size, sequence_length, input_size)
+y = tf.random.normal([1, 1])     # (batch_size, output_size)
+
+# Train the model
+model.fit(X, y, epochs=10)
+
+# Predict using the model
+output = model.predict(X)
+print(output)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Build Recurrent Neural Network by Using the Numpy Library
+import numpy as np
+
+# RNN configuration
+input_dim = 1
+hidden_dim = 10
+output_dim = 1
+learning_rate = 0.01
+sequence_length = 5
+num_epochs = 500
+
+# Initial weights and biases
+weight_input_hidden = np.random.randn(hidden_dim, input_dim) * 0.01
+weight_hidden_hidden = np.random.randn(hidden_dim, hidden_dim) * 0.01
+weight_hidden_output = np.random.randn(output_dim, hidden_dim) * 0.01
+
+bias_hidden = np.zeros((hidden_dim, 1))
+bias_output = np.zeros((output_dim, 1))
+
+# Activation function and its derivative
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+def sigmoid_derivative(output):
+    return output * (1 - output)
+    
+# Forward pass
+def forward_step(input_t, hidden_state_prev):
+    hidden_state = sigmoid(np.dot(weight_input_hidden, input_t) + np.dot(weight_hidden_hidden, hidden_state_prev) + bias_hidden)
+    output = np.dot(weight_hidden_output, hidden_state) + bias_output
+    return output, hidden_state
+    
+# Backpropagation Through Time (BPTT)
+def bptt(inputs, targets, initial_hidden_state):
+    global weight_input_hidden, weight_hidden_hidden, weight_hidden_output, bias_hidden, bias_output
+    
+    # Initialize gradients
+    grad_weight_input_hidden = np.zeros_like(weight_input_hidden)
+    grad_weight_hidden_hidden = np.zeros_like(weight_hidden_hidden)
+    grad_weight_hidden_output = np.zeros_like(weight_hidden_output)
+    grad_bias_hidden = np.zeros_like(bias_hidden)
+    grad_bias_output = np.zeros_like(bias_output)
+    grad_hidden_state_next = np.zeros_like(initial_hidden_state)
+    
+    # Store hidden states and outputs
+    hidden_states, predicted_outputs = [np.copy(initial_hidden_state)], []
+    
+    # Forward pass through each time step
+    hidden_state = initial_hidden_state
+    for input_t in inputs:
+        output, hidden_state = forward_step(input_t, hidden_state)
+        predicted_outputs.append(output)
+        hidden_states.append(hidden_state)
+    
+    # Backward pass through time
+    for t in reversed(range(len(inputs))):
+        output_error = predicted_outputs[t] - targets[t]
+        grad_weight_hidden_output += np.dot(output_error, hidden_states[t].T)
+        grad_bias_output += output_error
+        hidden_state_error = np.dot(weight_hidden_output.T, output_error) + grad_hidden_state_next
+        hidden_state_delta = sigmoid_derivative(hidden_states[t]) * hidden_state_error
+        grad_bias_hidden += hidden_state_delta
+        grad_weight_input_hidden += np.dot(hidden_state_delta, inputs[t].T)
+        grad_weight_hidden_hidden += np.dot(hidden_state_delta, hidden_states[t-1].T)
+        grad_hidden_state_next = np.dot(weight_hidden_hidden.T, hidden_state_delta)
+    
+    # Gradient clipping and parameter update
+    for grad in [grad_weight_input_hidden, grad_weight_hidden_hidden, grad_weight_hidden_output, grad_bias_hidden, grad_bias_output]:
+        np.clip(grad, -1, 1, out=grad)
+        
+    weight_input_hidden -= learning_rate * grad_weight_input_hidden
+    weight_hidden_hidden -= learning_rate * grad_weight_hidden_hidden
+    weight_hidden_output -= learning_rate * grad_weight_hidden_output
+    bias_hidden -= learning_rate * grad_bias_hidden
+    bias_output -= learning_rate * grad_bias_output
+    
+    return predicted_outputs, targets
+    
+# Accuracy Calculation
+def calculate_accuracy(predicted_outputs, targets):
+    correct_predictions = 0
+    for y_pred, y_true in zip(predicted_outputs, targets):
+        # Assuming a simple threshold to classify outputs
+        predicted_label = 1 if y_pred > 0.5 else 0
+        true_label = 1 if y_true > 0.5 else 0
+        correct_predictions += (predicted_label == true_label)
+    return correct_predictions / len(targets)
+# Training
+# Training
+for epoch in range(num_epochs):
+    initial_hidden_state = np.zeros((hidden_dim, 1))
+    inputs = [np.random.randn(input_dim, 1) for _ in range(sequence_length)]
+    targets = [np.random.randn(output_dim, 1) for _ in range(sequence_length)]
+    
+    predicted_outputs, targets = bptt(inputs, targets, initial_hidden_state)
+    
+    # Calculate loss (mean squared error)
+    loss = np.mean((np.array(targets) - np.array(predicted_outputs)) ** 2)
+    
+    # Calculate accuracy
+    accuracy = calculate_accuracy(predicted_outputs, targets)
+    
+    if epoch % 50 == 0:
+        print(f'Epoch {epoch}, Loss: {loss:.4f}, Accuracy: {accuracy:.4f}')
